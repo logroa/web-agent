@@ -1,0 +1,66 @@
+# Site Configuration for Web Agent
+# Define target sites and scraping rules
+
+sites:
+  - name: "Example Reports"
+    url: "https://example.com/reports"
+    enabled: true
+    file_types: [".pdf", ".csv", ".xlsx"]
+    filters:
+      include: ["2025", "annual", "quarterly"]
+      exclude: ["draft", "test", "preliminary"]
+    selectors:
+      # CSS selectors for finding download links
+      link_selector: "a[href*='.pdf'], a[href*='.csv'], a[href*='.xlsx']"
+      title_selector: "a"
+      date_selector: ".date, .published"
+    pagination:
+      enabled: false
+      next_button_selector: ".next, .pagination-next"
+      max_pages: 10
+    authentication:
+      required: false
+      type: "basic"  # basic, form, oauth
+      username: "${SITE_USERNAME}"
+      password: "${SITE_PASSWORD}"
+    rate_limit:
+      requests_per_minute: 30
+      delay_between_requests: 2
+
+  - name: "SEC EDGAR Filings"
+    url: "https://www.sec.gov/edgar/browse/"
+    enabled: false  # Disabled by default
+    file_types: [".pdf", ".htm", ".txt"]
+    filters:
+      include: ["10-K", "10-Q", "8-K"]
+      exclude: ["amendment", "/A"]
+    selectors:
+      link_selector: "a[href*='Archives/edgar/data']"
+      title_selector: "a"
+      date_selector: ".filed"
+    pagination:
+      enabled: true
+      next_button_selector: ".next"
+      max_pages: 5
+    rate_limit:
+      requests_per_minute: 10  # SEC has strict rate limits
+      delay_between_requests: 6
+
+  - name: "Open Data Portal"
+    url: "https://data.gov/dataset"
+    enabled: false
+    file_types: [".csv", ".json", ".xml"]
+    filters:
+      include: ["climate", "environment", "2024", "2025"]
+      exclude: ["deprecated", "beta"]
+    selectors:
+      link_selector: ".resource-item a[href*='download']"
+      title_selector: ".resource-item .heading"
+      date_selector: ".automatic-local-datetime"
+    pagination:
+      enabled: true
+      next_button_selector: ".pagination .next"
+      max_pages: 20
+    rate_limit:
+      requests_per_minute: 60
+      delay_between_requests: 1

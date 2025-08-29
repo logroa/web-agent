@@ -1,0 +1,57 @@
+# Global Agent Configuration
+# Web-Scraping & File Retrieval Agent
+
+# Database Configuration
+database:
+  type: "sqlite"  # sqlite or postgres
+  sqlite_path: "data/agent_memory.db"
+  postgres:
+    host: "localhost"
+    port: 5432
+    database: "web_agent"
+    username: "agent_user"
+    password: "${POSTGRES_PASSWORD}"
+
+# Storage Configuration
+storage:
+  type: "local"  # local or s3
+  local_path: "data/downloads"
+  s3:
+    bucket: "${S3_BUCKET}"
+    region: "us-east-1"
+    access_key: "${AWS_ACCESS_KEY_ID}"
+    secret_key: "${AWS_SECRET_ACCESS_KEY}"
+
+# Scraping Configuration
+scraping:
+  user_agent: "WebAgent/1.0 (+https://github.com/your-org/web-agent)"
+  timeout_seconds: 30
+  max_retries: 3
+  retry_delay_seconds: 5
+  respect_robots_txt: true
+  rate_limit_delay_seconds: 1
+  max_file_size_mb: 100
+  concurrent_downloads: 3
+
+# Logging Configuration
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  format: "json"  # json or text
+  log_file: "data/logs/agent.log"
+  max_log_size_mb: 10
+  backup_count: 5
+
+# LLM Configuration (Phase 2)
+llm:
+  enabled: false
+  provider: "openai"  # openai, anthropic
+  model: "gpt-3.5-turbo"
+  api_key: "${OPENAI_API_KEY}"
+  max_tokens: 1000
+  temperature: 0.1
+
+# Monitoring & Alerting
+monitoring:
+  enabled: false
+  webhook_url: "${MONITORING_WEBHOOK_URL}"
+  alert_on_failure_rate: 0.1  # Alert if >10% failure rate
