@@ -26,6 +26,10 @@ sites:
     rate_limit:
       requests_per_minute: 30
       delay_between_requests: 2
+    llm:
+      use_llm: true
+      relevance_threshold: 0.7
+      custom_instructions: "Focus on annual and quarterly reports from 2024-2025"
 
   - name: "SEC EDGAR Filings"
     url: "https://www.sec.gov/edgar/browse/"
@@ -45,6 +49,10 @@ sites:
     rate_limit:
       requests_per_minute: 10  # SEC has strict rate limits
       delay_between_requests: 6
+    llm:
+      use_llm: true
+      relevance_threshold: 0.8
+      custom_instructions: "Prioritize 10-K, 10-Q, and 8-K filings from major companies"
 
   - name: "Open Data Portal"
     url: "https://data.gov/dataset"
@@ -64,3 +72,7 @@ sites:
     rate_limit:
       requests_per_minute: 60
       delay_between_requests: 1
+    llm:
+      use_llm: true
+      relevance_threshold: 0.6
+      custom_instructions: "Focus on recent climate and environmental datasets with good data quality"

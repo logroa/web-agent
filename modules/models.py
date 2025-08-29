@@ -60,6 +60,12 @@ class RateLimitConfig(BaseModel):
     delay_between_requests: int = 2
 
 
+class LLMSiteConfig(BaseModel):
+    use_llm: bool = True
+    relevance_threshold: float = 0.6
+    custom_instructions: Optional[str] = None
+
+
 class SiteConfig(BaseModel):
     name: str
     url: HttpUrl
@@ -70,6 +76,7 @@ class SiteConfig(BaseModel):
     pagination: PaginationConfig = Field(default_factory=PaginationConfig)
     authentication: AuthenticationConfig = Field(default_factory=AuthenticationConfig)
     rate_limit: RateLimitConfig = Field(default_factory=RateLimitConfig)
+    llm: LLMSiteConfig = Field(default_factory=LLMSiteConfig)
 
     @validator('file_types')
     def validate_file_types(cls, v):

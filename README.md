@@ -12,7 +12,7 @@ This agent implements the **Perception → Reasoning → Action → Memory** loo
 
 ## Features
 
-### Phase 1 (Current - MVP)
+### Phase 1 (MVP - Completed)
 - ✅ **Rule-based scraping** with configurable selectors
 - ✅ **File type filtering** and content-based filtering
 - ✅ **Concurrent downloads** with rate limiting
@@ -22,10 +22,15 @@ This agent implements the **Perception → Reasoning → Action → Memory** loo
 - ✅ **Retry logic** and error handling
 - ✅ **Robots.txt compliance**
 
-### Phase 2 (Planned)
-- 🔄 **LLM-based reasoning** for intelligent filtering
-- 🔄 **PostgreSQL support** for production deployments
-- 🔄 **Airflow/Prefect integration** for orchestration
+### Phase 2 (Current - AI-Enhanced)
+- ✅ **LLM-based reasoning** with OpenAI/Anthropic integration
+- ✅ **Intelligent document filtering** using GPT-4 and Claude
+- ✅ **Custom reasoning instructions** per site
+- ✅ **Relevance scoring** and confidence thresholds
+- ✅ **PostgreSQL support** for production deployments
+- ✅ **Graceful LLM fallback** to rule-based filtering
+- ✅ **Comprehensive LLM error handling**
+- ✅ **Airflow DAG examples** for orchestration
 
 ### Phase 3 (Future)
 - 📋 **Semantic filtering** with embeddings
@@ -52,7 +57,14 @@ pip install -r requirements.txt
 playwright install chromium
 ```
 
-3. **Configure sites:**
+3. **Set up LLM API key (Phase 2):**
+```bash
+export OPENAI_API_KEY="your-openai-api-key-here"
+# OR for Anthropic
+export ANTHROPIC_API_KEY="your-anthropic-api-key-here"
+```
+
+4. **Configure sites:**
 Edit `config/sites.yaml` to define target websites:
 ```yaml
 sites:
@@ -63,9 +75,13 @@ sites:
     filters:
       include: ["2025", "annual"]
       exclude: ["draft", "test"]
+    llm:
+      use_llm: true
+      relevance_threshold: 0.7
+      custom_instructions: "Focus on annual and quarterly reports from major companies"
 ```
 
-4. **Run the agent:**
+5. **Run the agent:**
 ```bash
 python -m modules.orchestrator
 ```
@@ -112,6 +128,15 @@ logging:
   level: "INFO"
   format: "json"
   log_file: "data/logs/agent.log"
+
+# LLM Configuration (Phase 2)
+llm:
+  enabled: true
+  provider: "openai"  # openai or anthropic
+  model: "gpt-4o-mini"
+  api_key: "${OPENAI_API_KEY}"
+  max_tokens: 2000
+  temperature: 0.1
 ```
 
 ### Site Configuration (`config/sites.yaml`)
@@ -144,6 +169,41 @@ sites:
     rate_limit:
       requests_per_minute: 30
       delay_between_requests: 2
+    
+    # LLM Configuration (Phase 2)
+    llm:
+      use_llm: true
+      relevance_threshold: 0.7  # 0.0-1.0 confidence threshold
+      custom_instructions: "Focus on annual and quarterly reports from major companies"
+```
+
+## LLM Integration (Phase 2)
+
+### How It Works
+The agent uses Large Language Models to make intelligent decisions about document relevance:
+
+1. **Intelligent Filtering**: Beyond simple keyword matching, the LLM understands document context and relevance
+2. **Custom Instructions**: Each site can have specific instructions for the LLM (e.g., "Focus on annual reports from Fortune 500 companies")
+3. **Confidence Scoring**: Documents are scored 0.0-1.0 for relevance, with configurable thresholds
+4. **Graceful Fallback**: If LLM fails, automatically falls back to rule-based filtering
+
+### Supported Providers
+- **OpenAI**: GPT-4o, GPT-4o-mini, GPT-3.5-turbo
+- **Anthropic**: Claude-3 Haiku, Claude-3 Sonnet, Claude-3 Opus
+
+### Cost Considerations
+- **GPT-4o-mini**: ~$0.15 per 1M input tokens, ~$0.60 per 1M output tokens
+- **Claude-3 Haiku**: ~$0.25 per 1M input tokens, ~$1.25 per 1M output tokens
+- **Typical cost per site**: $0.01-0.10 per scraping session (depending on number of links)
+
+### LLM Configuration Options
+```yaml
+llm:
+  enabled: true
+  provider: "openai"  # or "anthropic"
+  model: "gpt-4o-mini"  # recommended for cost/performance balance
+  relevance_threshold: 0.7  # Higher = more selective
+  custom_instructions: "Your specific filtering criteria"
 ```
 
 ## Usage Examples

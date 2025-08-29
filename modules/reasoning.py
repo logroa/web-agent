@@ -30,9 +30,14 @@ class ReasoningEngine:
         self.rule_filters = RuleBasedFilter()
         
         # Initialize LLM reasoning if enabled (Phase 2)
+        self.llm_filter = None
         if llm_config.enabled:
-            logger.warning("LLM reasoning is enabled but not yet implemented (Phase 2 feature)")
-            # self.llm_filter = LLMBasedFilter(llm_config)
+            try:
+                self.llm_filter = LLMBasedFilter(llm_config)
+                logger.info("LLM reasoning engine initialized successfully")
+            except Exception as e:
+                logger.error(f"Failed to initialize LLM reasoning: {e}")
+                logger.warning("Falling back to rule-based reasoning only")
         
         logger.info(f"ReasoningEngine initialized (LLM: {'enabled' if llm_config.enabled else 'disabled'})")
     
@@ -77,13 +82,19 @@ class ReasoningEngine:
         
         # Step 4: Apply LLM filtering if enabled (Phase 2)
         final_links = rule_filtered_links
-        if use_llm and self.llm_config.enabled:
-            # llm_filtered_links, llm_stats = await self.llm_filter.filter_links(
-            #     rule_filtered_links, site_config
-            # )
-            # stats["llm_filtered"] = len(rule_filtered_links) - len(llm_filtered_links)
-            # final_links = llm_filtered_links
-            logger.warning("LLM filtering requested but not implemented yet")
+        if use_llm and self.llm_config.enabled and self.llm_filter:
+            try:
+                llm_filtered_links, llm_stats = await self.llm_filter.filter_links(
+                    rule_filtered_links, site_config
+                )
+                stats["llm_filtered"] = len(rule_filtered_links) - len(llm_filtered_links)
+                stats["reasons"].update(llm_stats.get("reasons", {}))
+                final_links = llm_filtered_links
+                logger.info(f"LLM filtering applied: {len(llm_filtered_links)}/{len(rule_filtered_links)} links passed")
+            except Exception as e:
+                logger.error(f"LLM filtering failed: {e}")
+                logger.warning("Falling back to rule-based filtering results")
+                final_links = rule_filtered_links
         
         stats["filtered_links"] = len(final_links)
         
@@ -367,14 +378,102 @@ class RuleBasedFilter:
             return False
 
 
-# Phase 2: LLM-based filtering (placeholder for future implementation)
+# Phase 2: LLM-based filtering implementation
 class LLMBasedFilter:
-    """LLM-based filtering engine for more sophisticated reasoning"""
+    """LLM-based filtering engine for sophisticated document relevance reasoning"""
     
     def __init__(self, llm_config: LLMConfig):
         self.config = llm_config
-        # Initialize LLM client here
-        logger.info("LLM-based filtering initialized (Phase 2 feature)")
+        self.client = None
+        self.chain = None
+        
+        # Initialize LLM client based on provider
+        self._initialize_llm_client()
+        logger.info(f"LLM-based filtering initialized with {llm_config.provider} {llm_config.model}")
+    
+    def _initialize_llm_client(self):
+        """Initialize the appropriate LLM client"""
+        try:
+            if self.config.provider.lower() == "openai":
+                from langchain_openai import ChatOpenAI
+                self.client = ChatOpenAI(
+                    model=self.config.model,
+                    api_key=self.config.api_key,
+                    max_tokens=self.config.max_tokens,
+                    temperature=self.config.temperature
+                )
+            elif self.config.provider.lower() == "anthropic":
+                from langchain_anthropic import ChatAnthropic
+                self.client = ChatAnthropic(
+                    model=self.config.model,
+                    api_key=self.config.api_key,
+                    max_tokens=self.config.max_tokens,
+                    temperature=self.config.temperature
+                )
+            else:
+                raise ValueError(f"Unsupported LLM provider: {self.config.provider}")
+            
+            # Create the reasoning chain
+            self._create_reasoning_chain()
+            
+        except ImportError as e:
+            raise Exception(f"Required LLM libraries not installed: {e}")
+        except Exception as e:
+            raise Exception(f"Failed to initialize LLM client: {e}")
+    
+    def _create_reasoning_chain(self):
+        """Create LangChain reasoning chain for document filtering"""
+        from langchain.prompts import PromptTemplate
+        from langchain.chains import LLMChain
+        
+        # Create the filtering prompt template
+        prompt_template = """You are an intelligent document filtering agent. Your task is to evaluate whether documents are relevant for download based on the given criteria.
+
+Site Information:
+- Site Name: {site_name}
+- Target File Types: {file_types}
+- Include Keywords: {include_keywords}
+- Exclude Keywords: {exclude_keywords}
+- Site Purpose: {site_purpose}
+
+Document Links to Evaluate:
+{document_links}
+
+For each document, analyze:
+1. Title/filename relevance to the include keywords
+2. Whether it matches the desired file types
+3. If it contains any exclude keywords that make it irrelevant
+4. Overall relevance to the site's purpose
+5. Document freshness/recency if determinable
+
+Respond with a JSON object containing:
+{{
+    "filtered_documents": [
+        {{
+            "url": "document_url",
+            "relevance_score": 0.0-1.0,
+            "reasoning": "brief explanation of why this document is/isn't relevant",
+            "include": true/false
+        }}
+    ],
+    "summary": {{
+        "total_evaluated": number,
+        "recommended_for_download": number,
+        "filtering_criteria_applied": ["list of main criteria used"]
+    }}
+}}
+
+Be selective but not overly restrictive. Focus on documents that clearly match the intent and criteria."""
+
+        self.prompt = PromptTemplate(
+            template=prompt_template,
+            input_variables=[
+                "site_name", "file_types", "include_keywords", 
+                "exclude_keywords", "site_purpose", "document_links"
+            ]
+        )
+        
+        self.chain = LLMChain(llm=self.client, prompt=self.prompt)
     
     async def filter_links(
         self,
@@ -382,20 +481,195 @@ class LLMBasedFilter:
         site_config: SiteConfig
     ) -> Tuple[List[ScrapedLink], Dict[str, Any]]:
         """Apply LLM-based filtering to links"""
-        # Placeholder for Phase 2 implementation
-        logger.warning("LLM filtering called but not implemented yet")
-        return links, {"reasons": {"llm_filter": 0}}
+        if not links:
+            return links, {"reasons": {"llm_filter": 0}}
+        
+        logger.info(f"Applying LLM filtering to {len(links)} links for {site_config.name}")
+        
+        stats = {
+            "reasons": {
+                "llm_relevance_filter": 0,
+                "llm_low_confidence": 0,
+                "llm_processing_error": 0
+            },
+            "llm_scores": []
+        }
+        
+        try:
+            # Process links in batches to avoid token limits
+            batch_size = 20  # Adjust based on model context window
+            filtered_links = []
+            
+            for i in range(0, len(links), batch_size):
+                batch = links[i:i + batch_size]
+                batch_filtered = await self._process_batch(batch, site_config, stats)
+                filtered_links.extend(batch_filtered)
+            
+            logger.info(f"LLM filtering complete: {len(filtered_links)}/{len(links)} links passed")
+            return filtered_links, stats
+            
+        except Exception as e:
+            logger.error(f"LLM filtering failed: {e}")
+            stats["reasons"]["llm_processing_error"] = len(links)
+            return links, stats  # Return original links on error
     
-    def _create_filtering_prompt(
+    async def _process_batch(
         self,
         links: List[ScrapedLink],
-        site_config: SiteConfig
-    ) -> str:
-        """Create prompt for LLM-based filtering"""
-        # This will be implemented in Phase 2
-        pass
+        site_config: SiteConfig,
+        stats: Dict[str, Any]
+    ) -> List[ScrapedLink]:
+        """Process a batch of links through LLM reasoning"""
+        
+        # Prepare document information for the prompt
+        document_links = []
+        for i, link in enumerate(links):
+            doc_info = {
+                "index": i,
+                "url": link.url,
+                "title": link.title or "No title",
+                "filename": link.filename,
+                "file_type": link.file_type,
+                "date": link.date or "Unknown date",
+                "size": link.size or "Unknown size"
+            }
+            document_links.append(doc_info)
+        
+        # Create the prompt inputs
+        site_purpose = self._infer_site_purpose(site_config)
+        if site_config.llm.custom_instructions:
+            site_purpose += f"\n\nSpecial Instructions: {site_config.llm.custom_instructions}"
+        
+        prompt_inputs = {
+            "site_name": site_config.name,
+            "file_types": ", ".join(site_config.file_types),
+            "include_keywords": ", ".join(site_config.filters.include) if site_config.filters.include else "Any relevant content",
+            "exclude_keywords": ", ".join(site_config.filters.exclude) if site_config.filters.exclude else "None specified",
+            "site_purpose": site_purpose,
+            "document_links": self._format_documents_for_prompt(document_links)
+        }
+        
+        try:
+            # Call the LLM
+            response = await self._call_llm_async(prompt_inputs)
+            
+            # Parse the response
+            filtered_links = self._parse_llm_response(response, links, stats, site_config)
+            return filtered_links
+            
+        except Exception as e:
+            logger.error(f"Error processing batch with LLM: {e}")
+            stats["reasons"]["llm_processing_error"] += len(links)
+            return links  # Return original batch on error
     
-    async def _call_llm(self, prompt: str) -> Dict[str, Any]:
-        """Call LLM API for reasoning"""
-        # This will be implemented in Phase 2
-        pass
+    async def _call_llm_async(self, prompt_inputs: Dict[str, Any]) -> str:
+        """Make async call to LLM"""
+        import asyncio
+        
+        # Use asyncio to run the sync LangChain call
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(
+            None, 
+            lambda: self.chain.run(**prompt_inputs)
+        )
+        return response
+    
+    def _parse_llm_response(
+        self,
+        response: str,
+        original_links: List[ScrapedLink],
+        stats: Dict[str, Any],
+        site_config: Optional[SiteConfig] = None
+    ) -> List[ScrapedLink]:
+        """Parse LLM JSON response and filter links"""
+        try:
+            import json
+            
+            # Try to extract JSON from response
+            response_clean = response.strip()
+            if response_clean.startswith("```json"):
+                response_clean = response_clean[7:]
+            if response_clean.endswith("```"):
+                response_clean = response_clean[:-3]
+            
+            result = json.loads(response_clean)
+            filtered_documents = result.get("filtered_documents", [])
+            
+            filtered_links = []
+            url_to_link = {link.url: link for link in original_links}
+            
+            for doc in filtered_documents:
+                url = doc.get("url")
+                include = doc.get("include", False)
+                relevance_score = doc.get("relevance_score", 0.0)
+                reasoning = doc.get("reasoning", "")
+                
+                if url in url_to_link and include:
+                    # Use site-specific relevance threshold
+                    threshold = site_config.llm.relevance_threshold if site_config else 0.6
+                    
+                    if relevance_score >= threshold:
+                        filtered_links.append(url_to_link[url])
+                        stats["llm_scores"].append({
+                            "url": url,
+                            "score": relevance_score,
+                            "reasoning": reasoning
+                        })
+                    else:
+                        stats["reasons"]["llm_low_confidence"] += 1
+                else:
+                    stats["reasons"]["llm_relevance_filter"] += 1
+            
+            return filtered_links
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse LLM JSON response: {e}")
+            logger.debug(f"Raw response: {response}")
+            stats["reasons"]["llm_processing_error"] += len(original_links)
+            return original_links
+        except Exception as e:
+            logger.error(f"Error parsing LLM response: {e}")
+            stats["reasons"]["llm_processing_error"] += len(original_links)
+            return original_links
+    
+    def _infer_site_purpose(self, site_config: SiteConfig) -> str:
+        """Infer the purpose of the site based on configuration"""
+        site_name = site_config.name.lower()
+        
+        if any(term in site_name for term in ["financial", "sec", "edgar", "report"]):
+            return "Financial reports and regulatory filings"
+        elif any(term in site_name for term in ["data", "dataset", "research"]):
+            return "Research data and datasets"
+        elif any(term in site_name for term in ["government", "gov", "regulatory"]):
+            return "Government documents and regulatory information"
+        elif any(term in site_name for term in ["news", "publication"]):
+            return "News articles and publications"
+        else:
+            # Use include keywords to infer purpose
+            if site_config.filters.include:
+                return f"Documents related to: {', '.join(site_config.filters.include[:3])}"
+            return "General document collection"
+    
+    def _format_documents_for_prompt(self, document_links: List[Dict[str, Any]]) -> str:
+        """Format document information for the LLM prompt"""
+        formatted = []
+        for doc in document_links:
+            formatted.append(
+                f"Document {doc['index'] + 1}:\n"
+                f"  URL: {doc['url']}\n"
+                f"  Title: {doc['title']}\n"
+                f"  Filename: {doc['filename']}\n"
+                f"  Type: {doc['file_type']}\n"
+                f"  Date: {doc['date']}\n"
+                f"  Size: {doc['size']}\n"
+            )
+        return "\n".join(formatted)
+    
+    def get_usage_stats(self) -> Dict[str, Any]:
+        """Get LLM usage statistics"""
+        # This could be expanded to track token usage, costs, etc.
+        return {
+            "provider": self.config.provider,
+            "model": self.config.model,
+            "status": "active" if self.client else "inactive"
+        }

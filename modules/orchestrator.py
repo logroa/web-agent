@@ -254,8 +254,15 @@ class AgentOrchestrator:
             
             # Step 2: Reasoning - Filter and prioritize links
             logger.info(f"Filtering {len(scraped_links)} links for {site_config.name}")
+            
+            # Use LLM filtering if enabled globally and for this site
+            use_llm = (
+                self.settings.llm.enabled and 
+                site_config.llm.use_llm
+            )
+            
             filtered_links, filtering_stats = await self.reasoning_engine.filter_links(
-                scraped_links, site_config
+                scraped_links, site_config, use_llm=use_llm
             )
             site_stats["links_filtered"] = len(filtered_links)
             site_stats["filtering_stats"] = filtering_stats

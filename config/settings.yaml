@@ -43,11 +43,11 @@ logging:
 
 # LLM Configuration (Phase 2)
 llm:
-  enabled: false
+  enabled: true  # Enable LLM-based reasoning
   provider: "openai"  # openai, anthropic
-  model: "gpt-3.5-turbo"
+  model: "gpt-4o-mini"  # More capable model for better reasoning
   api_key: "${OPENAI_API_KEY}"
-  max_tokens: 1000
+  max_tokens: 2000  # Increased for batch processing
   temperature: 0.1
 
 # Monitoring & Alerting
