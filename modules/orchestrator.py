@@ -226,11 +226,11 @@ class AgentOrchestrator:
         logger.info(f"Processing site: {site_config.name}")
         
         # Start scrape session
-        session = await self.memory_manager.start_scrape_session(site_config.name)
+        session_id = self.memory_manager.start_scrape_session(site_config.name)
         
         site_stats = {
             "site_name": site_config.name,
-            "session_id": session.id,
+            "session_id": session_id,
             "start_time": datetime.utcnow().isoformat(),
             "success": False,
             "links_found": 0,
@@ -305,7 +305,7 @@ class AgentOrchestrator:
             site_stats["errors"].append({"general_error": error_msg})
             
             # Log error to database
-            await self.memory_manager.log_error(
+            self.memory_manager.log_error(
                 error_type="site_processing_error",
                 error_message=error_msg,
                 site_name=site_config.name
@@ -313,8 +313,8 @@ class AgentOrchestrator:
         
         finally:
             # Complete scrape session
-            await self.memory_manager.complete_scrape_session(
-                session.id,
+            self.memory_manager.complete_scrape_session(
+                session_id,
                 success=site_stats["success"],
                 pages_scraped=1,  # For now, we scrape one page per site
                 files_found=site_stats["links_found"],
@@ -366,8 +366,8 @@ class AgentOrchestrator:
         
         try:
             # Get recent stats
-            error_stats = await self.memory_manager.get_error_stats(hours=24)
-            download_history = await self.memory_manager.get_download_history(limit=10)
+            error_stats = self.memory_manager.get_error_stats(hours=24)
+            download_history = self.memory_manager.get_download_history(limit=10)
             
             # Get storage stats
             storage_stats = {}

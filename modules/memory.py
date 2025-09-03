@@ -132,14 +132,15 @@ class MemoryManager:
             records = query.order_by(desc(DownloadRecord.downloaded_at)).limit(limit).all()
             return records
     
-    def start_scrape_session(self, site_name: str) -> ScrapeSession:
-        """Start a new scraping session"""
+    def start_scrape_session(self, site_name: str) -> int:
+        """Start a new scraping session and return the session ID"""
         with self.get_session() as session:
             scrape_session = ScrapeSession(site_name=site_name)
             session.add(scrape_session)
-            session.flush()
+            session.commit()
+            session_id = scrape_session.id
             logger.info(f"Started scrape session for {site_name}")
-            return scrape_session
+            return session_id
     
     def complete_scrape_session(
         self,

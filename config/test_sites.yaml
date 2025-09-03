@@ -1,0 +1,54 @@
+# Test Configuration for Local Development
+# Safe, public sites for testing the web agent
+
+sites:
+  - name: "Test PDF Site"
+    url: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"
+    enabled: true
+    file_types: [".pdf"]
+    filters:
+      include: ["dummy", "test"]
+      exclude: []
+    selectors:
+      link_selector: "a[href*='.pdf']"
+      title_selector: "a"
+    rate_limit:
+      requests_per_minute: 60
+      delay_between_requests: 1
+    llm:
+      use_llm: false  # Disable LLM for testing
+      relevance_threshold: 0.7
+
+  - name: "Sample CSV Data"
+    url: "https://raw.githubusercontent.com/datasets/gdp/master/data/gdp.csv"
+    enabled: true
+    file_types: [".csv"]
+    filters:
+      include: ["gdp", "data"]
+      exclude: []
+    selectors:
+      link_selector: "a[href*='.csv']"
+      title_selector: "a"
+    rate_limit:
+      requests_per_minute: 60
+      delay_between_requests: 1
+    llm:
+      use_llm: false
+      relevance_threshold: 0.7
+
+  - name: "GitHub README"
+    url: "https://raw.githubusercontent.com/octocat/Hello-World/master/README"
+    enabled: true
+    file_types: [".md", ".txt"]
+    filters:
+      include: ["readme", "hello"]
+      exclude: []
+    selectors:
+      link_selector: "a[href*='README'], a[href*='.md'], a[href*='.txt']"
+      title_selector: "a"
+    rate_limit:
+      requests_per_minute: 60
+      delay_between_requests: 1
+    llm:
+      use_llm: false
+      relevance_threshold: 0.7
